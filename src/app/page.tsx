@@ -3,30 +3,7 @@ import { useEffect, useReducer, useRef } from "react";
 import { fabric } from "fabric";
 import { Button } from "@/components/ui/button";
 
-enum CanvasActionType {
-    INIT_CANVAS = "INIT_CANVAS",
-    ADD_SHAPE = "ADD_SHAPE",
-    SAVE_DESIGN = "SAVE_DESIGN",
-    LOAD_DESIGN = "LOAD_DESIGN",
-    EXPORT_PNG = "EXPORT_PNG",
-    UNDO = "UNDO",
-    REDO = "REDO"
-}
-
-interface CanvasState {
-    canvas: fabric.Canvas | null;
-    history: string[];
-    historyIndex: number;
-}
-
-type CanvasAction =
-    | { type: CanvasActionType.INIT_CANVAS; payload: fabric.Canvas }
-    | { type: CanvasActionType.ADD_SHAPE; payload: fabric.Object }
-    | { type: CanvasActionType.SAVE_DESIGN }
-    | { type: CanvasActionType.LOAD_DESIGN }
-    | { type: CanvasActionType.EXPORT_PNG }
-    | { type: CanvasActionType.UNDO }
-    | { type: CanvasActionType.REDO };
+import { CanvasActionType, CanvasState, CanvasAction } from './desitnEditorTypes';
 
 const initialState: CanvasState = { canvas: null, history: [], historyIndex: -1 };
 
@@ -60,7 +37,11 @@ function reducer(state: CanvasState, action: CanvasAction): CanvasState {
                     state.canvas?.renderAll();
                 });
             }
-            return state;
+            return {
+                ...state,
+                history: [...state.history.slice(0, state.historyIndex + 1), JSON.stringify(state.canvas?.toJSON())],
+                historyIndex: state.historyIndex + 1
+            };
         case CanvasActionType.EXPORT_PNG:
             if (state.canvas) {
                 const dataURL = state.canvas.toDataURL({ format: "png", multiplier: 1 });
@@ -88,6 +69,25 @@ function reducer(state: CanvasState, action: CanvasAction): CanvasState {
                 return { ...state, historyIndex: state.historyIndex + 1 };
             }
             return state;
+        case CanvasActionType.BLURR:
+            if (state.canvas) {
+                const overlay = new fabric.Rect({
+                    left: 0,
+                    top: 0,
+                    width: state.canvas.width || 600,
+                    height: state.canvas.height || 400,
+                    fill: '#00000050',
+                    selectable: false,
+                    globalCompositeOperation: 'source-over'
+                });
+                state.canvas.add(overlay);
+                state.canvas?.renderAll();
+            }
+            return {
+                ...state,
+                history: [...state.history.slice(0, state.historyIndex + 1), JSON.stringify(state.canvas?.toJSON())],
+                historyIndex: state.historyIndex + 1
+            };
         default:
             return state;
     }
@@ -142,6 +142,7 @@ const DesignEditor = () => {
                 <Button onClick={exportDesign}>Download</Button>
                 <Button onClick={() => dispatch({ type: CanvasActionType.UNDO })}>Undo</Button>
                 <Button onClick={() => dispatch({ type: CanvasActionType.REDO })}>Redo</Button>
+                <Button onClick={() => dispatch({ type: CanvasActionType.BLURR })}>Blurr</Button>
             </div>
             <canvas ref={canvasRef} width={600} height={400} className="border" />
         </div>
