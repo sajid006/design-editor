@@ -9,10 +9,14 @@ enum CanvasActionType {
     SAVE_DESIGN = "SAVE_DESIGN",
     LOAD_DESIGN = "LOAD_DESIGN",
     EXPORT_PNG = "EXPORT_PNG",
+    UNDO = "UNDO",
+    REDO = "REDO"
 }
 
 interface CanvasState {
     canvas: fabric.Canvas | null;
+    history: string[];
+    historyIndex: number;
 }
 
 type CanvasAction =
@@ -20,29 +24,35 @@ type CanvasAction =
     | { type: CanvasActionType.ADD_SHAPE; payload: fabric.Object }
     | { type: CanvasActionType.SAVE_DESIGN }
     | { type: CanvasActionType.LOAD_DESIGN }
-    | { type: CanvasActionType.EXPORT_PNG };
+    | { type: CanvasActionType.EXPORT_PNG }
+    | { type: CanvasActionType.UNDO }
+    | { type: CanvasActionType.REDO };
 
-const initialState: CanvasState = { canvas: null };
+const initialState: CanvasState = { canvas: null, history: [], historyIndex: -1 };
 
 function reducer(state: CanvasState, action: CanvasAction): CanvasState {
     switch (action.type) {
         case CanvasActionType.INIT_CANVAS:
-            state.canvas = action.payload
+            state.canvas = action.payload;
             state.canvas?.renderAll();
-            return state;
+            return { ...state, history: [JSON.stringify(state.canvas?.toJSON())], historyIndex: 0 };
         case CanvasActionType.ADD_SHAPE:
             state.canvas?.add(action.payload);
             state.canvas?.renderAll();
-            return state;
+            return {
+                ...state,
+                history: [...state.history.slice(0, state.historyIndex + 1), JSON.stringify(state.canvas?.toJSON())],
+                historyIndex: state.historyIndex + 1
+            };
         case CanvasActionType.SAVE_DESIGN:
             if (state.canvas) {
                 localStorage.setItem("canvasDesign", JSON.stringify(state.canvas.toJSON()));
             }
             return state;
         case CanvasActionType.LOAD_DESIGN:
-            if(state.canvas){
+            if (state.canvas) {
                 const canvasData = localStorage.getItem("canvasDesign");
-                if(!canvasData){
+                if (!canvasData) {
                     alert('No design found');
                     return state;
                 }
@@ -58,6 +68,24 @@ function reducer(state: CanvasState, action: CanvasAction): CanvasState {
                 link.href = dataURL;
                 link.download = "design.png";
                 link.click();
+            }
+            return state;
+        case CanvasActionType.UNDO:
+            if (state.historyIndex > 0 && state.canvas) {
+                const prevState = state.history[state.historyIndex - 1];
+                state.canvas.loadFromJSON(prevState, () => {
+                    state.canvas?.renderAll();
+                });
+                return { ...state, historyIndex: state.historyIndex - 1 };
+            }
+            return state;
+        case CanvasActionType.REDO:
+            if (state.historyIndex < state.history.length - 1 && state.canvas) {
+                const nextState = state.history[state.historyIndex + 1];
+                state.canvas.loadFromJSON(nextState, () => {
+                    state.canvas?.renderAll();
+                });
+                return { ...state, historyIndex: state.historyIndex + 1 };
             }
             return state;
         default:
@@ -112,6 +140,8 @@ const DesignEditor = () => {
                 <Button onClick={saveDesign}>Save</Button>
                 <Button onClick={loadDesign}>Load</Button>
                 <Button onClick={exportDesign}>Download</Button>
+                <Button onClick={() => dispatch({ type: CanvasActionType.UNDO })}>Undo</Button>
+                <Button onClick={() => dispatch({ type: CanvasActionType.REDO })}>Redo</Button>
             </div>
             <canvas ref={canvasRef} width={600} height={400} className="border" />
         </div>

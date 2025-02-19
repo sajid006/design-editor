@@ -1,0 +1,5 @@
+Open a terminal in root directory:
+    * Run 'npm install' to install all the dependencies
+    * Run 'npm run dev' to run the project locally. The project will run on http://localhost:3000
+
+The project is deployed at: https://design-editor-by-sajid-hasan.vercel.app/
